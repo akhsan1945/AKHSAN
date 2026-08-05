@@ -5,7 +5,14 @@
 <section id="products" class="hidden"><div class="card"><h2>Produk & Harga</h2><div id="productEditor"></div><button class="brown" onclick="addProduct()">+ Tambah Produk</button></div></section>
 <section id="history" class="hidden"><div class="card"><h2>Riwayat Penjualan</h2><div id="historyRows"></div></div></section></div>
 <script>
-const URL="https://evpgnywtzdqnxkndgwxc.supabase.co",KEY="sb_publishable_uM9R6_nTT99RW4Sjt1ArcA_kw6fWgkn",db=supabase.createClient(URL,KEY);let products=[],rows=[],profile;
+const SUPABASE_URL = "https://evpgnywtzdqnxkndgwxc.supabase.co";
+const SUPABASE_KEY = "sb_publishable_uM9R6_nTT99RW4Sjt1ArcA_kw6fWgkn";
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let products = [];
+let rows = [];
+let profile;
 const rp=n=>new Intl.NumberFormat("id-ID").format(Number(n)||0),esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 async function login(){let {error}=await db.auth.signInWithPassword({email:email.value,password:password.value});if(error)err.textContent=error.message}
 async function boot(){let {data:{session}}=await db.auth.getSession();if(session)start(session)}
