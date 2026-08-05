@@ -1,0 +1,1 @@
+Nart Bake online cashier. Jalankan supabase_policies.sql di Supabase SQL Editor, lalu deploy index.html ke Vercel. Jangan pernah memasukkan service_role/secret key ke frontend.
