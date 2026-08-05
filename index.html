@@ -1,5 +1,5 @@
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nart Bake Online Cashier</title><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style>body{font-family:Arial;margin:0;background:#f7eee8;color:#432719}header{background:#5b2d1b;color:white;padding:18px;font-size:24px;font-weight:bold}.wrap{max-width:1100px;margin:auto;padding:20px}.card{background:white;border-radius:14px;padding:18px;margin:15px 0;box-shadow:0 5px 20px #0001}input,select{padding:10px;width:100%;box-sizing:border-box;margin:5px 0 12px;border:1px solid #d8c9bf;border-radius:7px}button{padding:10px 14px;border:0;border-radius:7px;font-weight:bold;cursor:pointer}.brown{background:#5b2d1b;color:white}.light{background:#eee2db}.red{background:#f3d7d2}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.row{display:grid;grid-template-columns:60px 1fr 130px 130px 40px;gap:8px;align-items:end;margin:8px 0}.receipt{max-width:700px;margin:auto;padding:40px;background:#fff}.brand{text-align:center}.circle{width:135px;height:135px;border:4px solid #63351f;border-radius:50%;margin:auto;display:flex;align-items:center;justify-content:center}.brandname{font:700 34px Georgia}.title{text-align:center;background:#633018;color:white;font-size:36px;font-weight:bold;padding:12px;margin:25px}.bill{text-align:center;font-size:24px;font-weight:bold}table{width:100%;border-collapse:collapse;margin-top:20px}th{background:#633018;color:white;padding:9px}td{padding:9px;border-bottom:1px solid #ddd}th:nth-child(n+3),td:nth-child(n+3){text-align:right}.summary{margin-left:45%;border-top:2px dashed #987461;padding-top:12px}.total{font-size:22px;font-weight:bold;display:flex;justify-content:space-between}.hidden{display:none}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px}@media(max-width:700px){.grid{grid-template-columns:1fr}.row{grid-template-columns:50px 1fr 90px 100px 35px}.receipt{padding:20px}.summary{margin-left:15%}}@media print{header,.tabs,.no-print{display:none!important}body{background:white}.receipt{box-shadow:none}}</style></head><body><header>nart bake <span id="userLabel" style="float:right;font-size:14px">Belum login</span></header>
-<div id="login" class="wrap"><div class="card" style="max-width:400px;margin:60px auto"><h2>Login Kasir</h2><label>Email</label><input id="email" type="email"><label>Password</label><input id="password" type="password"><p id="err"></p><button class="brown" onclick="login()">Masuk</button></div></div>
+<div id="login" class="wrap"><div class="card" style="max-width:400px;margin:60px auto"><h2>Login Kasir</h2><label>Email</label><input id="email" type="email"><label>Password</label><input id="password" type="password"><p id="err" style="min-height:20px;font-weight:bold"></p><button class="brown" onclick="login()">Masuk</button></div></div>
 <div id="app" class="wrap hidden"><div class="tabs"><button class="brown" onclick="show('cashier')">🧾 Kasir</button><button class="light" onclick="show('products')">📦 Produk</button><button class="light" onclick="show('history')">📊 Riwayat</button><button class="red" onclick="logout()">Keluar</button></div>
 <section id="cashier"><div class="card"><div class="grid"><div><label>Nama Pemesan</label><input id="customer"></div><div><label>Invoice</label><input id="invoice" readonly></div><div><label>Diskon</label><input id="discount" type="number" value="0"></div><div><label>Shipping</label><input id="shipping" type="number" value="0"></div></div><h3>Order</h3><div id="items"></div><button class="light" onclick="addRow()">+ Produk</button><p><button class="brown" onclick="saveSale()">Simpan Transaksi</button> <button class="light" onclick="print()">Cetak / PDF</button> <button class="red" onclick="newSale()">Baru</button></p><p id="msg"></p></div><div class="card"><div id="receipt"></div></div></section>
 <section id="products" class="hidden"><div class="card"><h2>Produk & Harga</h2><div id="productEditor"></div><button class="brown" onclick="addProduct()">+ Tambah Produk</button></div></section>
@@ -7,16 +7,35 @@
 <script>
 const SUPABASE_URL = "https://evpgnywtzdqnxkndgwxc.supabase.co";
 const SUPABASE_KEY = "sb_publishable_uM9R6_nTT99RW4Sjt1ArcA_kw6fWgkn";
-
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let products = [];
 let rows = [];
 let profile;
+
 const rp=n=>new Intl.NumberFormat("id-ID").format(Number(n)||0),esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
-async function login(){let {error}=await db.auth.signInWithPassword({email:email.value,password:password.value});if(error)err.textContent=error.message}
+async function login(){
+  const emailValue=document.getElementById("email").value.trim();
+  const passwordValue=document.getElementById("password").value;
+  const errEl=document.getElementById("err");
+  errEl.textContent="Memeriksa login...";errEl.style.color="#633018";
+  if(!emailValue||!passwordValue){errEl.textContent="Email dan password wajib diisi.";errEl.style.color="#b00020";return;}
+  try{
+    const {data,error}=await db.auth.signInWithPassword({email:emailValue,password:passwordValue});
+    if(error){console.error("Supabase login error:",error);errEl.textContent="Login gagal: "+(error.message||error.status||"Unknown error");errEl.style.color="#b00020";return;}
+    if(!data.session||!data.user){errEl.textContent="Login tidak menghasilkan session. Periksa akun Supabase.";errEl.style.color="#b00020";return;}
+    errEl.textContent="Login berhasil. Memuat profil...";errEl.style.color="#276749";
+    await start(data.session);
+  }catch(e){console.error("Unexpected login error:",e);errEl.textContent="Error aplikasi: "+(e.message||e);errEl.style.color="#b00020";}
+}
 async function boot(){let {data:{session}}=await db.auth.getSession();if(session)start(session)}
-async function start(s){let r=await db.from("profiles").select("*").eq("id",s.user.id).single();if(r.error)return alert("Profile belum terhubung ke User ID.");profile=r.data;userLabel.textContent=(profile.full_name||s.user.email)+" · "+profile.role;loginEl(false);await load();newSale()}
+async function start(s){
+  try{
+    const r=await db.from("profiles").select("*").eq("id",s.user.id).single();
+    if(r.error){console.error("Profile lookup error:",r.error);const errEl=document.getElementById("err");errEl.textContent="Login berhasil, tetapi profile belum terhubung: "+r.error.message;errEl.style.color="#b00020";return;}
+    profile=r.data;userLabel.textContent=(profile.full_name||s.user.email)+" · "+(profile.role||"kasir");loginEl(false);await load();await newSale();
+  }catch(e){console.error("Start error:",e);const errEl=document.getElementById("err");errEl.textContent="Gagal memuat profil: "+(e.message||e);errEl.style.color="#b00020";}
+}
 function loginEl(x){document.getElementById("login").classList.toggle("hidden",!x);document.getElementById("app").classList.toggle("hidden",x)}
 async function logout(){await db.auth.signOut();location.reload()}
 async function load(){let r=await db.from("products").select("*").eq("active",true).order("id");products=r.data||[]}
